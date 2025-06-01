@@ -30,6 +30,43 @@
 #include "gstsubsink-marshal.h"
 #include "gstsubsink.h"
 
+// Minimal CEA-608 decoder: extracts printable ASCII characters
+static gchar *decode_cea608_to_utf8(const guint8 *data, gsize size)
+{
+    GString *out = g_string_new(NULL);
+    for (gsize i = 0; i + 1 < size; i += 2) {
+        guint8 cc1 = data[i];
+        guint8 cc2 = data[i + 1];
+        // CEA-608 basic chars are in 0x20-0x7F
+        if (cc1 >= 0x20 && cc1 <= 0x7F)
+            g_string_append_c(out, cc1);
+        if (cc2 >= 0x20 && cc2 <= 0x7F)
+            g_string_append_c(out, cc2);
+    }
+    if (out->len == 0) {
+        g_string_free(out, TRUE);
+        return NULL;
+    }
+    return g_string_free(out, FALSE);
+}
+
+// Minimal CEA-708 decoder: extracts printable ASCII characters (for demo only)
+static gchar *decode_cea708_to_utf8(const guint8 *data, gsize size)
+{
+    GString *out = g_string_new(NULL);
+    for (gsize i = 0; i < size; ++i) {
+        guint8 cc = data[i];
+        // CEA-708 text is often in 0x20-0x7E, but real parsing is much more complex
+        if (cc >= 0x20 && cc <= 0x7E)
+            g_string_append_c(out, cc);
+    }
+    if (out->len == 0) {
+        g_string_free(out, TRUE);
+        return NULL;
+    }
+    return g_string_free(out, FALSE);
+}
+
 struct _GstSubSinkPrivate
 {
 	GstCaps *caps;
@@ -234,6 +271,54 @@ static GstFlowReturn gst_sub_sink_render_common(GstBaseSink *psink, GstBuffer *b
 
 	if (priv->flushing)
 		goto flushing;
+
+    // Get buffer caps
+    GstCaps *caps = gst_pad_get_current_caps(GST_BASE_SINK_PAD(psink));
+    if (caps) {
+        const gchar *mime = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+        if (g_str_has_prefix(mime, "closedcaption/x-cea-608")) {
+            // --- PATCH START ---
+            // Decode CEA-608 data from buffer
+            GstMapInfo map;
+            if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+                // TODO: Implement CEA-608 decoding here
+                gchar *subtitle_text = decode_cea608_to_utf8(map.data, map.size);
+                if (subtitle_text) {
+					GstBuffer *txtbuf = gst_buffer_new_wrapped(g_strdup(subtitle_text), strlen(subtitle_text));
+					GST_BUFFER_PTS(txtbuf) = GST_BUFFER_PTS(buffer);
+					GST_BUFFER_DTS(txtbuf) = GST_BUFFER_DTS(buffer);
+					g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, txtbuf);
+					g_free(subtitle_text);
+                }
+                gst_buffer_unmap(buffer, &map);
+            }
+            // --- PATCH END ---
+            gst_caps_unref(caps);
+            return GST_FLOW_OK;
+        } else if (g_str_has_prefix(mime, "closedcaption/x-cea-708")) {
+            // --- PATCH START ---
+            // Decode CEA-708 data from buffer
+            GstMapInfo map;
+            if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+                // TODO: Implement CEA-708 decoding here
+                gchar *subtitle_text = decode_cea708_to_utf8(map.data, map.size);
+                if (subtitle_text) {
+					GstBuffer *txtbuf = gst_buffer_new_wrapped(g_strdup(subtitle_text), strlen(subtitle_text));
+					GST_BUFFER_PTS(txtbuf) = GST_BUFFER_PTS(buffer);
+					GST_BUFFER_DTS(txtbuf) = GST_BUFFER_DTS(buffer);
+					g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, txtbuf);
+					g_free(subtitle_text);
+                }
+                gst_buffer_unmap(buffer, &map);
+            }
+            // --- PATCH END ---
+            gst_caps_unref(caps);
+            return GST_FLOW_OK;
+        }
+        gst_caps_unref(caps);
+    }
+
+    // Default: emit as usual
 
 	g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, gst_buffer_ref(buffer));
 
