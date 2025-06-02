@@ -272,54 +272,62 @@ static GstFlowReturn gst_sub_sink_render_common(GstBaseSink *psink, GstBuffer *b
 	if (priv->flushing)
 		goto flushing;
 
-    // Get buffer caps
-    GstCaps *caps = gst_pad_get_current_caps(GST_BASE_SINK_PAD(psink));
-    if (caps) {
-        const gchar *mime = gst_structure_get_name(gst_caps_get_structure(caps, 0));
-        if (g_str_has_prefix(mime, "closedcaption/x-cea-608")) {
-            // --- PATCH START ---
-            // Decode CEA-608 data from buffer
-            GstMapInfo map;
-            if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-                // TODO: Implement CEA-608 decoding here
-                gchar *subtitle_text = decode_cea608_to_utf8(map.data, map.size);
-                if (subtitle_text) {
+	// Get buffer caps
+	GstCaps *caps = gst_pad_get_current_caps(GST_BASE_SINK_PAD(psink));
+	if (caps) {
+		const gchar *mime = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+		GST_DEBUG_OBJECT(subsink, "Buffer received: size=%" G_GSIZE_FORMAT ", mime=%s", gst_buffer_get_size(buffer), mime);
+
+		if (g_str_has_prefix(mime, "closedcaption/x-cea-608")) {
+			GST_DEBUG_OBJECT(subsink, "Processing CEA-608 buffer");
+			GstMapInfo map;
+			if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+				gchar *subtitle_text = decode_cea608_to_utf8(map.data, map.size);
+				GST_DEBUG_OBJECT(subsink, "CEA-608 raw size=%" G_GSIZE_FORMAT, map.size);
+				if (subtitle_text) {
+					GST_INFO_OBJECT(subsink, "Decoded CEA-608: %s", subtitle_text);
 					GstBuffer *txtbuf = gst_buffer_new_wrapped(g_strdup(subtitle_text), strlen(subtitle_text));
 					GST_BUFFER_PTS(txtbuf) = GST_BUFFER_PTS(buffer);
 					GST_BUFFER_DTS(txtbuf) = GST_BUFFER_DTS(buffer);
 					g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, txtbuf);
 					g_free(subtitle_text);
-                }
-                gst_buffer_unmap(buffer, &map);
-            }
-            // --- PATCH END ---
-            gst_caps_unref(caps);
-            return GST_FLOW_OK;
-        } else if (g_str_has_prefix(mime, "closedcaption/x-cea-708")) {
-            // --- PATCH START ---
-            // Decode CEA-708 data from buffer
-            GstMapInfo map;
-            if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-                // TODO: Implement CEA-708 decoding here
-                gchar *subtitle_text = decode_cea708_to_utf8(map.data, map.size);
-                if (subtitle_text) {
+				} else {
+					GST_WARNING_OBJECT(subsink, "CEA-608: No printable text found");
+				}
+				gst_buffer_unmap(buffer, &map);
+			}
+			gst_caps_unref(caps);
+			return GST_FLOW_OK;
+		} else if (g_str_has_prefix(mime, "closedcaption/x-cea-708")) {
+			GST_DEBUG_OBJECT(subsink, "Processing CEA-708 buffer");
+			GstMapInfo map;
+			if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+				gchar *subtitle_text = decode_cea708_to_utf8(map.data, map.size);
+				GST_DEBUG_OBJECT(subsink, "CEA-708 raw size=%" G_GSIZE_FORMAT, map.size);
+				if (subtitle_text) {
+					GST_INFO_OBJECT(subsink, "Decoded CEA-708: %s", subtitle_text);
 					GstBuffer *txtbuf = gst_buffer_new_wrapped(g_strdup(subtitle_text), strlen(subtitle_text));
 					GST_BUFFER_PTS(txtbuf) = GST_BUFFER_PTS(buffer);
 					GST_BUFFER_DTS(txtbuf) = GST_BUFFER_DTS(buffer);
 					g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, txtbuf);
 					g_free(subtitle_text);
-                }
-                gst_buffer_unmap(buffer, &map);
-            }
-            // --- PATCH END ---
-            gst_caps_unref(caps);
-            return GST_FLOW_OK;
-        }
-        gst_caps_unref(caps);
-    }
+				} else {
+					GST_WARNING_OBJECT(subsink, "CEA-708: No printable text found");
+				}
+				gst_buffer_unmap(buffer, &map);
+			}
+			gst_caps_unref(caps);
+			return GST_FLOW_OK;
+		} else {
+			GST_DEBUG_OBJECT(subsink, "Passing through subtitle buffer of type: %s", mime);
+		}
+		gst_caps_unref(caps);
+	} else {
+		GST_WARNING_OBJECT(subsink, "No caps available for buffer!");
+	}
 
-    // Default: emit as usual
-
+	// Default: emit as usual
+	GST_DEBUG_OBJECT(subsink, "Emitting buffer as-is (non-CC subtitle)");
 	g_signal_emit(subsink, gst_sub_sink_signals[SIGNAL_NEW_BUFFER], 0, gst_buffer_ref(buffer));
 
 	return GST_FLOW_OK;
