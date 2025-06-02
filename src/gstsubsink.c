@@ -516,8 +516,13 @@ static gboolean gst_sub_sink_change_event(GstBaseSink *sink, GstEvent *event)
 		{
 			GstCaps *caps;
 			gst_event_parse_caps(event, &caps);
-			GST_INFO_OBJECT(subsink,"CAPS %"GST_PTR_FORMAT, caps);
-			ret = GST_BASE_SINK_CLASS(parent_class)->event(sink, event);
+            const gchar *mime = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+            GST_INFO_OBJECT(subsink, "CAPS EVENT: mime=%s, caps=%" GST_PTR_FORMAT, mime, caps);
+            if (g_str_has_prefix(mime, "closedcaption/")) {
+                GST_INFO_OBJECT(subsink, "Got CC caps - format=%s", 
+                    gst_structure_get_string(gst_caps_get_structure(caps, 0), "format"));
+            }
+            ret = GST_BASE_SINK_CLASS(parent_class)->event(sink, event);
 			if (!ret)
 			{
 				gst_event_unref(event);
