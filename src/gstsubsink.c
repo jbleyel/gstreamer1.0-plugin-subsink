@@ -99,7 +99,26 @@ static GstStaticPadTemplate gst_sub_sink_template =
 GST_STATIC_PAD_TEMPLATE("sink",
 		GST_PAD_SINK,
 		GST_PAD_ALWAYS,
-		GST_STATIC_CAPS_ANY);
+		GST_STATIC_CAPS(
+			"text/plain; "
+			"text/x-raw; "
+			"text/x-pango-markup; "
+			"subpicture/x-dvd; "
+			"subpicture/x-dvb; "
+			"subpicture/x-pgs; "
+			"text/vtt; "
+			"text/x-webvtt; "
+			"text/x-ssa; "         // SubStation Alpha
+			"text/x-ass; "         // Advanced SubStation Alpha  
+			"application/x-ass; "  // Alternative ASS format
+			"application/x-ssa; "  // Alternative SSA format
+			"application/x-subtitle-vtt; "
+			"closedcaption/x-cea-608,format=(string)raw; "
+			"closedcaption/x-cea-708,format=(string)cc_data; "
+			"video/x-dvd-subpicture; "
+			"subpicture/x-xsub"
+		)
+);
 static GstBaseSinkClass *parent_class = NULL;
 
 static void gst_sub_sink_uri_handler_init(gpointer g_iface,
