@@ -115,6 +115,8 @@ GST_STATIC_PAD_TEMPLATE("sink",
 			"application/x-subtitle-vtt; "
 			"closedcaption/x-cea-608,format=(string)raw; "
 			"closedcaption/x-cea-708,format=(string)cc_data; "
+			"closedcaption/x-cea-608,format=(string)raw,field=(int)[0,1],framerate=(fraction)30/1; "
+			"closedcaption/x-cea-708,format=(string)cc_data,framerate=(fraction)30/1; "
 			"video/x-dvd-subpicture; "
 			"subpicture/x-xsub"
 		)
