@@ -573,6 +573,16 @@ static gboolean gst_sub_sink_change_event(GstBaseSink *sink, GstEvent *event)
 			GST_INFO_OBJECT(subsink,"TOC %"GST_PTR_FORMAT, toc_list);
 			gst_event_unref(event);
 		} break;
+		case GST_EVENT_CUSTOM_DOWNSTREAM:
+		case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
+		case GST_EVENT_CUSTOM_UPSTREAM:
+		{
+			const GstStructure *str = gst_event_get_structure(event);
+			if (str && gst_structure_has_name(str, "playsink-custom-subtitle-flush")) {
+				GST_INFO_OBJECT(subsink, "Got playsink-custom-subtitle-flush event");
+			}
+			ret = GST_BASE_SINK_CLASS(parent_class)->event(sink, event);
+		} break;
 		default:
 			ret = GST_BASE_SINK_CLASS(parent_class)->event(sink, event);
 			break;
